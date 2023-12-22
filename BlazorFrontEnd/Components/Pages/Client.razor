@@ -41,7 +41,10 @@
                     {
                         <td>Нет</td>
                     }
-                    <td><button @onclick="@(async ()=>await Delete(c.IdClient))">@c.IdClient</button></td>
+                    <td>
+                        <a class="btn btn-primary" @onclick="()=>Edit(c)">Изменить</a>
+                        <a class="btn btn-primary" @onclick="@(async ()=>await Delete(c.IdClient))">Удалить</a>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -97,7 +100,18 @@
     HttpClient httpClient=new HttpClient();
     List<String> genders = new List<string> { "мужской", "женский"};
 
-
+    void Edit(ClientService p)
+    {
+        client.IdClient = p.IdClient;
+        client.Surname = p.Surname;
+        client.Firstname = p.Firstname;
+        client.Lastname = p.Lastname;
+        client.BirthDate = p.BirthDate;
+        client.City = p.City;
+        client.Interest = p.Interest;
+        client.Gender = p.Gender;
+        client.HasPair = p.HasPair;
+    }
     protected override async Task OnInitializedAsync(){
         httpClient = ClientFactory.CreateClient();
         httpClient.BaseAddress = new Uri("https://localhost:7287/api/client");
@@ -108,11 +122,19 @@
         (httpClient.BaseAddress)??clients;
     }
     async Task Submit(){
-        await httpClient.PostAsJsonAsync(httpClient.BaseAddress, client);
-        await LoadData();
-    }
-    async Task Update(){
-        await httpClient.PutAsJsonAsync(httpClient.BaseAddress, client);
+        if (client.IdClient==0)
+            await httpClient.PostAsJsonAsync(httpClient.BaseAddress, client);
+        else
+            await httpClient.PutAsJsonAsync(httpClient.BaseAddress, client);
+        client.IdClient = 0;
+        client.Surname = "";
+        client.Firstname ="";
+        client.Lastname = "";
+        client.BirthDate = new DateTime();
+        client.City = "";
+        client.Interest = "";
+        client.Gender = "";
+        client.HasPair = false;
         await LoadData();
     }
     async Task Delete(int id){
