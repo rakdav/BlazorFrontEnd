@@ -1,0 +1,166 @@
+﻿@page "/asq"
+@using BlazorFrontEnd.Models
+@inject IHttpClientFactory ClientFactory;
+@rendermode RenderMode.InteractiveServer
+
+<PageTitle>Знакомства</PageTitle>
+
+<div class="container">
+    <div class="row">
+        <div class="col text-center p-2">
+            <h1 class="text-center">Список клиентов</h1>
+            <table class="table table-bordered table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Мужчина</th>
+                        <th>Женщина</th>
+                        <th>Дата свидания</th>
+                        <th>Согласие мужчины</th>
+                        <th>Согласие женщины</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (ClientLock c in clientLock)
+                    {
+                        <tr>
+                            <td>@c.FIOMan</td>
+                            <td>@c.FIOWoman</td>
+                            <td>@String.Format($"{c.Date:d}")"</td>
+                            <td>@c.ManAgr</td>
+                            <td>@c.WomanAgr</td>
+                            <td>
+        @*                         <a class="btn btn-primary" @onclick="()=>Edit(c)">Изменить</a>
+         *@                        <a class="btn btn-primary" @onclick="@(async ()=>await Delete(c.IdAcq))">Удалить</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="col">
+            <EditForm Model="@lockClient">
+                <p>
+                    ФИО Мужчины:<br/>
+                    <InputSelect class="form-control" @bind-Value="lockClient.FIOMan">
+                        @foreach (var man in Mans)
+                        {
+                            <option value="@man">@(man.Surname)
+                                @(man?.Firstname?.Substring(1,1)).
+                                @(man?.Lastname?.Substring(1, 1)).
+                                </option>
+                        }
+                    </InputSelect>
+                </p>
+                <p>
+                    ФИО Женщины:<br />
+                    <InputSelect class="form-control" @bind-Value="lockClient.FIOWoman">
+                        @foreach (var man in Womans)
+                        {
+                            <option value="@man">
+                                @(man.Surname)
+                                @(man?.Firstname?.Substring(1, 1)).
+                                @(man?.Lastname?.Substring(1, 1)).
+                            </option>
+                        }
+                    </InputSelect>
+                </p>
+                <p>
+                    Дата свидания:<br />
+                    <InputDate @bind-Value="lockClient.Date" class="form-control" />
+                </p>
+                <div class="form-check">
+                    <InputCheckbox class="form-check-input" @bind-Value="lockClient.ManAgr" />
+                    Согласие мужчины<br />
+                </div>
+                <div class="form-check">
+                    <InputCheckbox class="form-check-input" @bind-Value="lockClient.WomanAgr" />
+                    Согласие женщины<br />
+                </div>
+                <button class="btn btn-primary" type="submit">Отправить</button>
+                <button class="btn btn-primary" type="reset">Сбросить</button>
+            </EditForm>
+        </div>
+     </div>
+</div>
+@code 
+{
+    List<AcqClass> asqs = [];
+    AcqClass client = new();
+    HttpClient httpClient = new HttpClient();
+    List<ClientLock> clientLock = new();
+    ClientLock lockClient=new();
+    public ClientService[] Mans { get; set; } = [];
+    public ClientService[] Womans { get; set; } = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        httpClient = ClientFactory.CreateClient();
+        httpClient.BaseAddress = new Uri("https://localhost:7287/api/acqs");
+        await LoadData();
+        List<ClientService>? list = await httpClient.GetFromJsonAsync<List<ClientService>>
+        (new Uri("https://localhost:7287/api/client"));
+        Mans = list!.Where(p => p.Gender == "мужской").ToArray();
+        Womans = list!.Where(p => p.Gender == "женский").ToArray();
+    }
+    async Task Submit()
+    {
+        if (lockClient.IdAcq == 0)
+        {
+            
+            await httpClient.PostAsJsonAsync(httpClient.BaseAddress, client);
+        }
+        else
+        {
+            await httpClient.PutAsJsonAsync(httpClient.BaseAddress, client);
+        }
+        lockClient.IdAcq = 0;
+        lockClient.FIOMan = "";
+        lockClient.FIOWoman = "";
+        lockClient.ManAgr = false;
+        lockClient.WomanAgr = false;
+
+        await LoadData();
+    }
+    async Task LoadData()
+    {
+        asqs = await httpClient.GetFromJsonAsync<List<AcqClass>>
+        (httpClient.BaseAddress) ?? asqs;
+        foreach (AcqClass i in asqs)
+        {
+            ClientService? csMan = await httpClient.GetFromJsonAsync<ClientService>
+            (new Uri("https://localhost:7287/api/client/"+i.IdClientMan));
+            string man = csMan!.Surname + " " + csMan?.Firstname?.Substring(1,1) + "." + csMan?.Lastname?.Substring(1,1)+".";
+            ClientService? csWoman = await httpClient.GetFromJsonAsync<ClientService>
+            (new Uri("https://localhost:7287/api/client/" + i.IdClientMan));
+            string woman = csWoman!.Surname + " " + csWoman?.Firstname?.Substring(1,1) + " " + csWoman?.Lastname?.Substring(1,1);
+            clientLock.Add(new ClientLock
+            {
+                IdAcq=i.IdAcq,
+                FIOMan=man,
+                FIOWoman=woman,
+                Date=i.Date,
+                ManAgr=i.ManAgr,
+                WomanAgr=i.WomanAgr
+            });
+        }
+    }
+
+    async Task Delete(int? id)
+    {
+        await httpClient.DeleteAsync($"{httpClient.BaseAddress}/{id}");
+        clientLock.Remove(clientLock.Where(p => p.IdAcq == id).FirstOrDefault()!);
+        await LoadData();
+
+    }
+
+    class ClientLock
+    {
+        public int? IdAcq { get; set; }
+        public string? FIOMan { get; set; }
+        public string? FIOWoman { get; set; }
+        public DateTime? Date { get; set; }
+        public bool WomanAgr { get; set; }
+        public bool ManAgr { get; set; }
+    }
+}

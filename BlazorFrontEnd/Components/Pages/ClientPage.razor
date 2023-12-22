@@ -1,0 +1,160 @@
+﻿@page "/"
+@using BlazorFrontEnd.Models
+@inject IHttpClientFactory ClientFactory;
+
+@rendermode RenderMode.InteractiveServer
+
+<PageTitle>Клиенты</PageTitle>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col">
+            <h1 class="text-center">Список клиентов</h1>
+            <table class="table table-bordered table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>Фамилия</th>
+                        <th>Имя</th>
+                        <th>Отчество</th>
+                        <th>День рождения</th>
+                        <th>Город</th>
+                        <th>Интересы</th>
+                        <th>Пол</th>
+                        <th>Есть пара</th>
+                        <th>Изменения</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(ClientService c in clients)
+                    {
+                        <tr>
+                            <td>@c.Surname</td>
+                            <td>@c.Firstname</td>
+                            <td>@c.Lastname</td>
+                            <td>@c.BirthDate</td>
+                            <td>@c.City</td>
+                            <td>@c.Interest</td>
+                            <td>@c.Gender</td>
+                            @if (c.HasPair == true)
+                            {
+                                <td>Есть</td>
+                            }
+                            else
+                            {
+                                <td>Нет</td>
+                            }
+                            <td>
+                                <a class="btn btn-primary" @onclick="()=>Edit(c)">Изменить</a>
+                                <a class="btn btn-primary" @onclick="@(async ()=>await Delete(c.IdClient))">Удалить</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="col">
+            <EditForm Model="@client" OnSubmit="Submit">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+            <p>
+                Фамилия:<br/>
+                    <InputText @bind-Value="client.Surname" class="form-control"/>
+                    <ValidationMessage For="@(() => client.Surname)" />
+            </p>
+            <p>
+                Имя:<br />
+                    <InputText @bind-Value="client.Firstname" class="form-control" />
+                    <ValidationMessage For="@(() => client.Firstname)" />
+            </p>
+            <p>
+                Отчество:<br />
+                    <InputText @bind-Value="client.Lastname" class="form-control" />
+            </p>
+            <p>
+                День орждения:<br />
+                    <InputDate @bind-Value="client.BirthDate" class="form-control" />
+            </p>
+            <p>
+                Город:<br />
+                    <InputText @bind-Value="client.City" class="form-control" />
+                    <ValidationMessage For="@(() => client.City)" />
+            </p>
+            <p>
+                Интересы:<br />
+                    <InputTextArea @bind-Value="client.Interest" class="form-control" />
+                    <ValidationMessage For="@(() => client.Interest)" />
+            </p>
+            <p>
+                <InputRadioGroup @bind-Value="@client.Gender">
+                Пол:<br />
+                        @foreach (var gender in genders)
+                        {
+                            <div class="form-check">
+                            <InputRadio Value="gender" class="form-check-input" />
+                            @gender
+                            </div>
+                        }
+                </InputRadioGroup>
+            </p>
+                <div class="form-check">
+                    Пара:<br />
+                    <InputCheckbox class="form-check-input" @bind-Value="client.HasPair" />
+
+                </div>>
+                <button class="btn btn-primary" type="submit">Отправить</button>
+                <button class="btn btn-primary" type="reset" onclick="Reset">Очистить</button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+@code{
+    List<ClientService> clients=[];
+    ClientService client=new();
+    HttpClient httpClient=new HttpClient();
+    List<String> genders = new List<string> { "мужской", "женский"};
+
+    void Edit(ClientService p)
+    {
+        client.IdClient = p.IdClient;
+        client.Surname = p.Surname;
+        client.Firstname = p.Firstname;
+        client.Lastname = p.Lastname;
+        client.BirthDate = p.BirthDate;
+        client.City = p.City;
+        client.Interest = p.Interest;
+        client.Gender = p.Gender;
+        client.HasPair = p.HasPair;
+    }
+    protected override async Task OnInitializedAsync(){
+        httpClient = ClientFactory.CreateClient();
+        httpClient.BaseAddress = new Uri("https://localhost:7287/api/client");
+        await LoadData();
+    }
+    async Task LoadData(){
+        clients = await httpClient.GetFromJsonAsync<List<ClientService>>
+        (httpClient.BaseAddress)??clients;
+    }
+    async Task Submit(){
+        if (client.IdClient==0)
+            await httpClient.PostAsJsonAsync(httpClient.BaseAddress, client);
+        else
+            await httpClient.PutAsJsonAsync(httpClient.BaseAddress, client);
+        client.IdClient = 0;
+        client.Surname = "";
+        client.Firstname ="";
+        client.Lastname = "";
+        client.BirthDate = new DateTime();
+        client.City = "";
+        client.Interest = "";
+        client.Gender = "";
+        client.HasPair = false;
+        await LoadData();
+    }
+    void Reset()
+    {
+        client.IdClient = 0;
+    }
+    async Task Delete(int id){
+        await httpClient.DeleteAsync($"{httpClient.BaseAddress}/{id}");
+        await LoadData();
+    }
+}
