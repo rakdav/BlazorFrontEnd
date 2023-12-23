@@ -30,8 +30,8 @@
                             <td>@c.ManAgr</td>
                             <td>@c.WomanAgr</td>
                             <td>
-        @*                         <a class="btn btn-primary" @onclick="()=>Edit(c)">Изменить</a>
-         *@                        <a class="btn btn-primary" @onclick="@(async ()=>await Delete(c.IdAcq))">Удалить</a>
+                                <a class="btn btn-primary" @onclick="()=>Edit(c)">Изменить</a>
+                                <a class="btn btn-primary" @onclick="@(async ()=>await Delete(c.IdAcq))">Удалить</a>
                             </td>
                         </tr>
                     }
@@ -39,15 +39,19 @@
             </table>
         </div>
         <div class="col">
-            <EditForm Model="@lockClient">
+            <EditForm Model="@lockClient" OnSubmit="Submit">
                 <p>
                     ФИО Мужчины:<br/>
                     <InputSelect class="form-control" @bind-Value="lockClient.FIOMan">
+                        @if (lockClient.FIOMan is null)
+                        {
+                            <option selected value="">None</option>
+                        }
                         @foreach (var man in Mans)
                         {
-                            <option value="@man">@(man.Surname)
+                            <option value="@man.IdClient">@(man.Surname)
                                 @(man?.Firstname?.Substring(1,1)).
-                                @(man?.Lastname?.Substring(1, 1)).
+                                @(man?.Lastname?.Substring(1,1)).
                                 </option>
                         }
                     </InputSelect>
@@ -55,9 +59,13 @@
                 <p>
                     ФИО Женщины:<br />
                     <InputSelect class="form-control" @bind-Value="lockClient.FIOWoman">
+                        @if (lockClient.FIOWoman is null)
+                        {
+                            <option selected value="">None</option>
+                        }
                         @foreach (var man in Womans)
                         {
-                            <option value="@man">
+                            <option value="@man.IdClient">
                                 @(man.Surname)
                                 @(man?.Firstname?.Substring(1, 1)).
                                 @(man?.Lastname?.Substring(1, 1)).
@@ -103,36 +111,57 @@
         Mans = list!.Where(p => p.Gender == "мужской").ToArray();
         Womans = list!.Where(p => p.Gender == "женский").ToArray();
     }
+    void Edit(ClientLock p)
+    {
+        lockClient.IdAcq = p.IdAcq;
+        lockClient.FIOMan = p.FIOMan;
+        lockClient.FIOWoman = p.FIOWoman;
+        lockClient.Date = p.Date;
+        lockClient.ManAgr = p.ManAgr;
+        lockClient.WomanAgr = p.WomanAgr;
+    }
     async Task Submit()
     {
-        if (lockClient.IdAcq == 0)
+        if (lockClient.IdAcq == null)
         {
-            
-            await httpClient.PostAsJsonAsync(httpClient.BaseAddress, client);
+            AcqClass cs = new AcqClass();
+            cs.IdClientMan = int.Parse(lockClient.FIOMan!);
+            cs.IdClientWoman = int.Parse(lockClient.FIOWoman!);
+            cs.Date = lockClient.Date;
+            cs.WomanAgr = lockClient.WomanAgr;
+            cs.ManAgr = lockClient.ManAgr;
+            await httpClient.PostAsJsonAsync(httpClient.BaseAddress, cs);
         }
         else
         {
-            await httpClient.PutAsJsonAsync(httpClient.BaseAddress, client);
+            AcqClass? cs = await httpClient.GetFromJsonAsync<AcqClass>
+        (new Uri("https://localhost:7287/api/acqs/"+lockClient.IdAcq));
+            cs!.IdClientMan = int.Parse(lockClient.FIOMan!);
+            cs.IdClientWoman = int.Parse(lockClient.FIOWoman!);
+            cs.Date = lockClient.Date;
+            cs.WomanAgr = lockClient.WomanAgr;
+            cs.ManAgr = lockClient.ManAgr;
+            await httpClient.PutAsJsonAsync(httpClient.BaseAddress, cs);
         }
-        lockClient.IdAcq = 0;
+        lockClient.IdAcq = null;
         lockClient.FIOMan = "";
         lockClient.FIOWoman = "";
         lockClient.ManAgr = false;
         lockClient.WomanAgr = false;
-
         await LoadData();
     }
     async Task LoadData()
     {
         asqs = await httpClient.GetFromJsonAsync<List<AcqClass>>
         (httpClient.BaseAddress) ?? asqs;
+        clientLock.Clear();
         foreach (AcqClass i in asqs)
         {
             ClientService? csMan = await httpClient.GetFromJsonAsync<ClientService>
             (new Uri("https://localhost:7287/api/client/"+i.IdClientMan));
             string man = csMan!.Surname + " " + csMan?.Firstname?.Substring(1,1) + "." + csMan?.Lastname?.Substring(1,1)+".";
             ClientService? csWoman = await httpClient.GetFromJsonAsync<ClientService>
-            (new Uri("https://localhost:7287/api/client/" + i.IdClientMan));
+            (new Uri("https://localhost:7287/api/client/" + i.IdClientWoman));
             string woman = csWoman!.Surname + " " + csWoman?.Firstname?.Substring(1,1) + " " + csWoman?.Lastname?.Substring(1,1);
             clientLock.Add(new ClientLock
             {
